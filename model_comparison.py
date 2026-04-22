@@ -20,7 +20,7 @@ from datetime import datetime
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-
+from sklearn.model_selection import train_test_split
 import numpy as np
 import pandas as pd
 from joblib import dump
@@ -58,8 +58,25 @@ def load_and_preprocess(filepath="data/telecom_churn.csv", random_state=42):
     """
     # TODO: Load the CSV, select NUMERIC_FEATURES into X, use `churned` as y,
     #       split 80/20 with stratify=y.
-    pass
+    # Load the CSV
+    df = pd.read_csv(filepath)
 
+    # Select only the NUMERIC_FEATURES columns for X
+    X = df[NUMERIC_FEATURES]
+
+    # Use 'churned' as the target y
+    y = df['churned']
+
+    # Split 80/20 with stratify=y to maintain class proportions
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, 
+        y, 
+        test_size=0.20, 
+        stratify=y, 
+        random_state=random_state
+    )
+
+    return X_train, X_test, y_train, y_test
 
 def define_models():
     """Define 6 model configurations for comparison.
