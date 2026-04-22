@@ -104,7 +104,51 @@ def define_models():
     # TODO: Build a Pipeline for each model. LR pipelines include
     #       StandardScaler; tree pipelines use 'passthrough' for the
     #       scaler step. All models with randomness use random_state=42.
-    pass
+   
+    # 1. Dummy Baseline
+    dummy_pipe = Pipeline([
+        ('scaler', 'passthrough'),
+        ('model', DummyClassifier(strategy='most_frequent'))
+    ])
+
+    # 2. Logistic Regression Default
+    lr_default_pipe = Pipeline([
+        ('scaler', StandardScaler()),
+        ('model', LogisticRegression(max_iter=1000, random_state=42))
+    ])
+
+    # 3. Logistic Regression Balanced
+    lr_balanced_pipe = Pipeline([
+        ('scaler', StandardScaler()),
+        ('model', LogisticRegression(class_weight='balanced', max_iter=1000, random_state=42))
+    ])
+
+    # 4. Decision Tree Baseline
+    dt_pipe = Pipeline([
+        ('scaler', 'passthrough'),
+        ('model', DecisionTreeClassifier(max_depth=5, random_state=42))
+    ])
+
+    # 5. Random Forest Default
+    rf_default_pipe = Pipeline([
+        ('scaler', 'passthrough'),
+        ('model', RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42))
+    ])
+
+    # 6. Random Forest Balanced
+    rf_balanced_pipe = Pipeline([
+        ('scaler', 'passthrough'),
+        ('model', RandomForestClassifier(n_estimators=100, max_depth=10, class_weight='balanced', random_state=42))
+    ])
+
+    return {
+        'Dummy': dummy_pipe,
+        'LR_default': lr_default_pipe,
+        'LR_balanced': lr_balanced_pipe,
+        'DT_depth5': dt_pipe,
+        'RF_default': rf_default_pipe,
+        'RF_balanced': rf_balanced_pipe
+    }
 
 
 def run_cv_comparison(models, X, y, n_splits=5, random_state=42):
