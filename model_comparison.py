@@ -56,7 +56,7 @@ def load_and_preprocess(filepath="data/telecom_churn.csv", random_state=42):
         Tuple (X_train, X_test, y_train, y_test) where X contains only
         NUMERIC_FEATURES and y is the `churned` column.
     """
-    # TODO: Load the CSV, select NUMERIC_FEATURES into X, use `churned` as y,
+    #       Load the CSV, select NUMERIC_FEATURES into X, use `churned` as y,
     #       split 80/20 with stratify=y.
     # Load the CSV
     df = pd.read_csv(filepath)
@@ -101,7 +101,7 @@ def define_models():
         Names: 'Dummy', 'LR_default', 'LR_balanced', 'DT_depth5',
                'RF_default', 'RF_balanced'.
     """
-    # TODO: Build a Pipeline for each model. LR pipelines include
+    #       Build a Pipeline for each model. LR pipelines include
     #       StandardScaler; tree pipelines use 'passthrough' for the
     #       scaler step. All models with randomness use random_state=42.
    
@@ -171,10 +171,39 @@ def run_cv_comparison(models, X, y, n_splits=5, random_state=42):
         f1_mean, f1_std, pr_auc_mean, pr_auc_std.
         One row per model (6 rows total).
     """
-    # TODO: Create a StratifiedKFold splitter. For each model, loop over
+    #       Create a StratifiedKFold splitter. For each model, loop over
     #       folds: fit on train, predict on val, compute the 5 metrics.
     #       Collect fold scores, compute mean ± std. Return as DataFrame.
-    pass
+    skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    all_results = []
+
+    for name, pipeline in models.items():
+        metrics = {'acc': [], 'prec': [], 'rec': [], 'f1': [], 'pr_auc': []}
+        
+        for train_idx, val_idx in skf.split(X, y):
+            X_fold_train, X_fold_val = X.iloc[train_idx], X.iloc[val_idx]
+            y_fold_train, y_fold_val = y.iloc[train_idx], y.iloc[val_idx]
+            
+            pipeline.fit(X_fold_train, y_fold_train)
+            y_pred = pipeline.predict(X_fold_val)
+            y_prob = pipeline.predict_proba(X_fold_val)[:, 1]
+            
+            metrics['acc'].append(accuracy_score(y_fold_val, y_pred))
+            metrics['prec'].append(precision_score(y_fold_val, y_pred, zero_division=0))
+            metrics['rec'].append(recall_score(y_fold_val, y_pred, zero_division=0))
+            metrics['f1'].append(f1_score(y_fold_val, y_pred, zero_division=0))
+            metrics['pr_auc'].append(average_precision_score(y_fold_val, y_prob))
+            
+        all_results.append({
+            'model': name,
+            'accuracy_mean': np.mean(metrics['acc']), 'accuracy_std': np.std(metrics['acc']),
+            'precision_mean': np.mean(metrics['prec']), 'precision_std': np.std(metrics['prec']),
+            'recall_mean': np.mean(metrics['rec']), 'recall_std': np.std(metrics['rec']),
+            'f1_mean': np.mean(metrics['f1']), 'f1_std': np.std(metrics['f1']),
+            'pr_auc_mean': np.mean(metrics['pr_auc']), 'pr_auc_std': np.std(metrics['pr_auc'])
+        })
+    
+    return pd.DataFrame(all_results)
 
 
 def save_comparison_table(results_df, output_path="results/comparison_table.csv"):
@@ -184,8 +213,8 @@ def save_comparison_table(results_df, output_path="results/comparison_table.csv"
         results_df: DataFrame from run_cv_comparison().
         output_path: Destination path.
     """
-    # TODO: Save results_df to CSV (with index=False).
-    pass
+    #     Save results_df to CSV (with index=False).
+    results_df.to_csv(output_path, index=False)
 
 
 def plot_pr_curves_top3(models, X_test, y_test, output_path="results/pr_curves.png"):
@@ -204,7 +233,20 @@ def plot_pr_curves_top3(models, X_test, y_test, output_path="results/pr_curves.p
     # TODO: Compute PR-AUC for each model on the test set. Select the top 3.
     #       Create a figure, plot each with PrecisionRecallDisplay.from_estimator
     #       on the same axes. Title, save, close.
-    pass
+    scores = {}
+    for name, pipeline in models.items():
+        y_prob = pipeline.predict_proba(X_test)[:, 1]
+        scores[name] = average_precision_score(y_test, y_prob)
+    
+    top3_names = sorted(scores, key=scores.get, reverse=True)[:3]
+    
+    fig, ax = plt.subplots(figsize=(8, 6))
+    for name in top3_names:
+        PrecisionRecallDisplay.from_estimator(models[name], X_test, y_test, ax=ax, name=name)
+    
+    ax.set_title("Top 3 Models: Precision-Recall Curves")
+    plt.savefig(output_path)
+    plt.close()
 
 
 def plot_calibration_top3(models, X_test, y_test, output_path="results/calibration.png"):
@@ -218,9 +260,22 @@ def plot_calibration_top3(models, X_test, y_test, output_path="results/calibrati
         y_test: Test labels.
         output_path: Destination path for the PNG.
     """
-    # TODO: Same top 3 as PR curves. Create a figure, plot each with
+    #       Same top 3 as PR curves. Create a figure, plot each with
     #       CalibrationDisplay.from_estimator. Title, save, close.
-    pass
+    scores = {}
+    for name, pipeline in models.items():
+        y_prob = pipeline.predict_proba(X_test)[:, 1]
+        scores[name] = average_precision_score(y_test, y_prob)
+    
+    top3_names = sorted(scores, key=scores.get, reverse=True)[:3]
+    
+    fig, ax = plt.subplots(figsize=(8, 6))
+    for name in top3_names:
+        CalibrationDisplay.from_estimator(models[name], X_test, y_test, n_bins=10, ax=ax, name=name)
+    
+    ax.set_title("Top 3 Models: Calibration Plots")
+    plt.savefig(output_path)
+    plt.close()
 
 
 def save_best_model(best_model, output_path="results/best_model.joblib"):
@@ -230,8 +285,8 @@ def save_best_model(best_model, output_path="results/best_model.joblib"):
         best_model: A fitted sklearn Pipeline.
         output_path: Destination path.
     """
-    # TODO: Call dump(best_model, output_path).
-    pass
+    #   Call dump(best_model, output_path).
+    dump(best_model, output_path)
 
 
 def log_experiment(results_df, output_path="results/experiment_log.csv"):
@@ -245,11 +300,14 @@ def log_experiment(results_df, output_path="results/experiment_log.csv"):
         results_df: DataFrame from run_cv_comparison().
         output_path: Destination path.
     """
-    # TODO: Build a log DataFrame with columns: model_name, accuracy,
+    #       Build a log DataFrame with columns: model_name, accuracy,
     #       precision, recall, f1, pr_auc (use the mean values from
     #       results_df), and a timestamp column with the current time.
     #       Save to CSV.
-    pass
+    log_df = results_df[['model', 'accuracy_mean', 'precision_mean', 'recall_mean', 'f1_mean', 'pr_auc_mean']].copy()
+    log_df.columns = ['model_name', 'accuracy', 'precision', 'recall', 'f1', 'pr_auc']
+    log_df['timestamp'] = datetime.now().isoformat()
+    log_df.to_csv(output_path, index=False)
 
 
 def find_tree_vs_linear_disagreement(rf_model, lr_model, X_test, y_test,
@@ -287,8 +345,68 @@ def find_tree_vs_linear_disagreement(rf_model, lr_model, X_test, y_test,
     #       absolute difference of P(churn=1). Find the sample with the
     #       MAXIMUM difference (must be >= min_diff). Return the dict
     #       with all six fields.
-    pass
+    rf_probs = rf_model.predict_proba(X_test)[:, 1]
+    lr_probs = lr_model.predict_proba(X_test)[:, 1]
+    diffs = np.abs(rf_probs - lr_probs)
+    max_idx = np.argmax(diffs)
+    
+    if diffs[max_idx] < min_diff:
+        return None
+        
+    return {
+        "sample_idx": int(X_test.index[max_idx]),
+        "feature_values": dict(zip(feature_names, X_test.iloc[max_idx])),
+        "rf_proba": float(rf_probs[max_idx]),
+        "lr_proba": float(lr_probs[max_idx]),
+        "prob_diff": float(diffs[max_idx]),
+        "true_label": int(y_test.iloc[max_idx])
+    }
 
+
+def optimize_thresholds(best_model, X_test, y_test, output_path="results/threshold_sweep.png"):
+    """Tier 1: Sweep thresholds and find the one that fits capacity constraints."""
+    y_probs = best_model.predict_proba(X_test)[:, 1]
+    thresholds = np.arange(0.1, 0.95, 0.05)
+    
+    sweep_results = []
+    for t in thresholds:
+        y_pred = (y_probs >= t).astype(int)
+        
+       
+        prec = precision_score(y_test, y_pred, zero_division=0)
+        rec = recall_score(y_test, y_pred, zero_division=0)
+        f1 = f1_score(y_test, y_pred, zero_division=0)
+
+        alerts_per_1000 = (y_pred.sum() / len(y_test)) * 1000
+        
+        sweep_results.append({
+            'threshold': t,
+            'precision': prec,
+            'recall': rec,
+            'f1': f1,
+            'alerts_per_1000': alerts_per_1000
+        })
+    
+    sweep_df = pd.DataFrame(sweep_results)
+    
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(sweep_df['threshold'], sweep_df['precision'], label='Precision', marker='o')
+    plt.plot(sweep_df['threshold'], sweep_df['recall'], label='Recall', marker='s')
+    plt.plot(sweep_df['threshold'], sweep_df['f1'], label='F1 Score', linestyle='--', color='black')
+    
+    
+    plt.axhline(y=0.5, color='gray', linestyle=':', alpha=0.5) 
+    
+    plt.title("Threshold Sweep: Precision, Recall, and F1")
+    plt.xlabel("Threshold")
+    plt.ylabel("Metric Value")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig(output_path)
+    plt.close()
+    
+    return sweep_df
 
 def main():
     """Orchestrate all 9 integration tasks. Run with: python model_comparison.py"""
@@ -384,6 +502,23 @@ def main():
         with open("results/tree_vs_linear_disagreement.md", "w") as f:
             f.write("\n".join(md_lines))
         print("  Saved to results/tree_vs_linear_disagreement.md")
+
+    # Tier 1 Extension: Threshold Optimization
+    print("\n--- Running Tier 1: Threshold Optimization ---")
+    best_model_pipeline = fitted_models[best_name]
+    sweep_df = optimize_thresholds(best_model_pipeline, X_test, y_test)
+    
+    
+    sweep_df.to_csv("results/threshold_sweep_results.csv", index=False)
+    
+    
+    target_alerts = 15.0
+    
+    recommended_row = sweep_df.iloc[(sweep_df['alerts_per_1000'] - target_alerts).abs().argsort()[:1]]
+    
+    print(f"Recommended Threshold for 150/10000 capacity: {recommended_row['threshold'].values[0]}")
+    print(f"Expected Recall at this threshold: {recommended_row['recall'].values[0]:.2%}")
+    print(f"Alerts per 1000: {recommended_row['alerts_per_1000'].values[0]:.1f}")
 
     print("\n--- All results saved to results/ ---")
     print("Write your decision memo in the PR description (Task 10).")
